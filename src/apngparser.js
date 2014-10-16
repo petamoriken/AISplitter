@@ -1,5 +1,5 @@
 /*!
- * APNG Parser v0.0.1 | MIT Licence | Kenta Moriuchi (@printf_moriken)
+ * APNG Parser v0.0.2 | MIT Licence | Kenta Moriuchi (@printf_moriken)
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -7,30 +7,57 @@
  * @license https://github.com/davidmz/apng-canvas/blob/master/LICENSE (MIT License)
  */
 
-(function(window){
+(function(window) {
 	"use strict";
 
-	function APNGParser(url) {
+	// IE9
+	var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
 
-		this.binary = null;
-		this.image = null;
-		this.loaded = false;
+	function APNGParser() {
+	}
+
+	APNGParser.prototype.read = function(url) {
+		var frames = new Frames(url);
+		return frames;
+	};
+
+	window.APNGParser = APNGParser;
+
+
+	//Image Object
+	function Frames(url) {
+		this.width = 0;
+		this.height = 0;
+		this.numPlays = 0;
+		this.frames = [];
+		this.playTime = 0;
 
 		this._onload = [];
+		this.loaded = false;
 
+		this._urlToPNGFrames(url);
+	}
+
+	Frames.prototype.on = function(ev, func) {
+		if(ev === "load") {
+			this._onload.push(func);
+		}
+	};
+
+	Frames.prototype._urlToPNGFrames = function(url) {
 		var _this = this;
-
 		var xhr = new XMLHttpRequest();
 
+		// BlobConstructor
+		var Blob = window.Blob;
+
 		// BlobBuilder
-		// Tips: window.MozBlobBuilder is deprecated in Modern FF
+		// Tips: window.MozBlobBuilder is deprecated in modern FF
 		var BlobBuilder = (window.BlobBuilder || window.WebKitBlobBuilder || window.MSBlobBuilder || window.MozBlobBuilder);
 
-		// IE9
-		var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
-
 		// XHR 2
-		var useResponseType = (typeof xhr.responseType !== "undefined" && typeof BlobBuilder !== "undefined");
+		var useResponseType = (typeof xhr.responseType !== "undefined" && (typeof Blob !== "undefined" || typeof BlobBuilder !== "undefined"));
+		
 		// old Safari
 		var useXUserDefined = (typeof xhr.overrideMimeType !== "undefined" && !useResponseType);
 
@@ -48,24 +75,34 @@
 
 					var reader = new FileReader();
 
-					if("readAsBinaryString" in reader){
+					if("readAsBinaryString" in reader) {
 
 						reader.onload = function () {
-							_this._parseImageObject(this.result);
+							_this._parseAPNG(this.result);
 						};
-						var bb = new BlobBuilder();
-						bb.append(this.response);
-						reader.readAsBinaryString(bb.getBlob());
+
+						if(typeof Blob !== "undefined") { // BlobConstructor
+
+							var b = new Blob([this.response]);
+							reader.readAsBinaryString(b);
+
+						} else { // BlobBuilder
+
+							var bb = new BlobBuilder();
+							bb.append(this.response);
+							reader.readAsBinaryString(bb.getBlob());
+
+						}
 
 					} else { // IE 10~
 
 						var binary = "";
 						var bytes = new Uint8Array(this.response);
 						var length = bytes.byteLength;
-						for (var i = 0; i < length; ++i) {
-							binary += String.fromCharCode(bytes[i]);
+						for (var k = 0; k < length; ++k) {
+							binary += String.fromCharCode(bytes[k]);
 						}
-						_this._parseImageObject(binary);
+						_this._parseAPNG(binary);
 
 					}
 
@@ -78,10 +115,10 @@
 						var raw = APNGIEBinaryToBinStr(this.responseBody);
 						for (var j = 0, l = raw.length; j < l; ++j) {
 							var c = raw.charCodeAt(j);
-							res += String.fromCharCode(c & 0xFF, (c >> 8) & 0xFF);
+							res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
 						}
 
-					} else { // Modern FF and old Safari
+					} else { // old Safari
 
 						var binStr = this.responseText;
 						for (var i = 0, len = binStr.length; i < len; ++i) {
@@ -89,7 +126,7 @@
 						}
 
 					}
-					_this._parseImageObject(res);
+					_this._parseAPNG(res);
 
 				}
 
@@ -98,43 +135,11 @@
 			}
 		};
 		xhr.send();	
-	}
-
-	APNGParser.prototype.on = function(ev, func) {
-		if(ev === "load") {
-			this._onload.push(func);
-		}
 	};
 
-	APNGParser.prototype._parseImageObject = function(bin) {
-		this.binary = bin;
-		this.image = new Flames(this, bin);
-	};
+	Frames.prototype._parseAPNG = function(imageData) {
 
-	APNGParser.prototype._loadend = function() {
-		this.loaded = true;
-		for(var i=0, l=this._onload.length; i<l; ++i) {
-			this._onload[i].call(this);
-		}
-	};
-
-	window.APNGParser = APNGParser;
-
-
-	//Image Object
-	function Flames(parent, bin) {
-
-		this.width = 0;
-		this.height = 0;
-		this.numPlays = 0;
-		this.frames = [];
-		this.playTime = 0;
-
-		this._parseAPNG(parent, bin);
-	}
-
-	Flames.prototype._parseAPNG = function(parent, imageData) {
-		if (imageData.substr(0, 8) != PNG_SIGNATURE) {
+		if (imageData.substr(0, 8) !== PNG_SIGNATURE) {
 			console.error("This File is not PNG");
 		}
 
@@ -203,13 +208,14 @@
 			var img = new Image();
 			frame = this.frames[i];
 			frame.img = img;
+
 			img.onload = function () {
 				++loadedImages;
-				if (loadedImages == _this.frames.length) {
-					// load end
-					parent._loadend();
+				if (loadedImages == _this.frames.length) { // Load End
+					_this._loadend();
 				}
 			};
+
 			img.onerror = function () {
 				console.error("Image creation error");
 			};
@@ -219,11 +225,20 @@
 			headerData = writeDWord(frame.width) + writeDWord(frame.height) + headerData.substr(8);
 			db.append(writeChunk("IHDR", headerData));
 			db.append(preData);
-			for (var j = 0; j < frame.dataParts.length; ++j)
+			for (var j = 0; j < frame.dataParts.length; ++j) {
 				db.append(writeChunk("IDAT", frame.dataParts[j]));
+			}
 			db.append(postData);
+
 			img.src = db.getUrl("image/png");
 			delete frame.dataParts;
+		}
+	};
+
+	Frames.prototype._loadend = function() {
+		this.loaded = true;
+		for(var i=0, l=this._onload.length; i<l; ++i) {
+			this._onload.shift().call(this);
 		}
 	};
 
@@ -277,7 +292,7 @@
 		}
 	};
 
-	if (navigator.userAgent.match(/msie [9.]/i)) {
+	if (isMSIE9) {
 		// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
 		document.addEventListener("DOMContentLoaded", function () {
 			var script = document.createElement("script");

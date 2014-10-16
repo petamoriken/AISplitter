@@ -1,15 +1,16 @@
-APNGParser
+APNGParser v0.0.2
 ==========
 
 Parse APNG to Normal PNG Flames.  
 This Program is inspired by [APNG-canvas].  
 
-    var APNGObject = null;
-    var APNG = new APNGParser(url);
+    var url = "hoge.png";
+    var APNG = new APNGParser();
+    var APNGObject = APNG.read(url);
     
-    APNG.on("load", function() {
+    APNGObject.on("load", function() {
     	// no EventObject, use this
-    	APNGObject = this.image;
+    	console.log(this);
     });
 
 
