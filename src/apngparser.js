@@ -48,61 +48,47 @@
 		var _this = this;
 		var xhr = new XMLHttpRequest();
 
-		// BlobConstructor
-		var Blob = window.Blob;
-
-		// BlobBuilder
-		// Tips: window.MozBlobBuilder is deprecated in modern FF
-		var BlobBuilder = (window.BlobBuilder || window.WebKitBlobBuilder || window.MSBlobBuilder || window.MozBlobBuilder);
-
 		// XHR 2
-		var useResponseType = (typeof xhr.responseType !== "undefined" && (typeof Blob !== "undefined" || typeof BlobBuilder !== "undefined"));
+		var useResponseType = (typeof xhr.responseType !== "undefined");
 		
 		// old Safari
 		var useXUserDefined = (typeof xhr.overrideMimeType !== "undefined" && !useResponseType);
 
 		xhr.open('GET', url, true);
 		if (useResponseType) { // XHR 2
-			xhr.responseType = "arraybuffer";
-		} else if (useXUserDefined) { //old Safari
+			xhr.responseType = "blob";
+		} else if (useXUserDefined) { // old Safari
 			xhr.overrideMimeType('text/plain; charset=x-user-defined');
 		}
 
-		xhr.onreadystatechange = function (e) {
+		xhr.onreadystatechange = function(e) {
 			if (this.readyState == 4 && this.status == 200) {
 
-				if (useResponseType) { // XHR 2
+				if (useResponseType) {
 
 					var reader = new FileReader();
 
-					if("readAsBinaryString" in reader) {
+					if(typeof reader.readAsBinaryString !== "undefined") {
 
-						reader.onload = function () {
+						reader.onload = function() {
 							_this._parseAPNG(this.result);
 						};
 
-						if(typeof Blob !== "undefined") { // BlobConstructor
-
-							var b = new Blob([this.response]);
-							reader.readAsBinaryString(b);
-
-						} else { // BlobBuilder
-
-							var bb = new BlobBuilder();
-							bb.append(this.response);
-							reader.readAsBinaryString(bb.getBlob());
-
-						}
+						reader.readAsBinaryString(this.response);
 
 					} else { // IE 10~
 
-						var binary = "";
-						var bytes = new Uint8Array(this.response);
-						var length = bytes.byteLength;
-						for (var k = 0; k < length; ++k) {
-							binary += String.fromCharCode(bytes[k]);
-						}
-						_this._parseAPNG(binary);
+						reader.onload = function() {
+							var binary = "";
+							var bytes = new Uint8Array(this.result);
+							var length = bytes.byteLength;
+							for (var k = 0; k < length; ++k) {
+								binary += String.fromCharCode(bytes[k]);
+							}
+							_this._parseAPNG(binary);
+						};
+
+						reader.readAsArrayBuffer(this.response);
 
 					}
 
@@ -145,11 +131,10 @@
 
 		var headerData, preData = "", postData = "", isAnimated = false;
 
-		var off = 8, frame = null;
+		var off = 8, frame = null, length, type, data;
 		do {
-			var length = readDWord(imageData.substr(off, 4));
-			var type = imageData.substr(off + 4, 4);
-			var data;
+			length = readDWord(imageData.substr(off, 4));
+			type = imageData.substr(off + 4, 4);
 
 			switch (type) {
 				case "IHDR":
@@ -297,7 +282,8 @@
 		document.addEventListener("DOMContentLoaded", function () {
 			var script = document.createElement("script");
 			script.setAttribute('type', 'text/vbscript');
-			script.text = "Function APNGIEBinaryToBinStr(Binary)\r\n" +
+			script.text =
+				"Function APNGIEBinaryToBinStr(Binary)\r\n" +
 				"   APNGIEBinaryToBinStr = CStr(Binary)\r\n" +
 				"End Function\r\n";
 			document.body.appendChild(script);
