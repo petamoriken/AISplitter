@@ -6,10 +6,10 @@ This Program is inspired by [APNG-canvas].
 
     var url = "hoge.png";
     var APNG = new APNGParser();
-    var APNGObject = APNG.read(url);
+    var PNGFrames = APNG.read(url);
     
-    APNGObject.on("load", function() {
-    	// no EventObject, use this
+    PNGFrames.on("load", function() {
+    	// no argumants, use this
     	console.log(this);
     });
 
