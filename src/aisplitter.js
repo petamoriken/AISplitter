@@ -1,5 +1,5 @@
 /*!
- * APNG Parser v0.0.2 | MIT Licence | Kenta Moriuchi (@printf_moriken)
+ * Animation Image Splitter v1.0.0 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -13,19 +13,32 @@
 	// IE9
 	var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
 
-	function APNGParser() {
+	if (isMSIE9) {
+		// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
+		document.addEventListener("DOMContentLoaded", function () {
+			var script = document.createElement("script");
+			script.setAttribute('type', 'text/vbscript');
+			script.text =
+				"Function IEBinaryToBinStr(Binary)\r\n" +
+				"   IEBinaryToBinStr = CStr(Binary)\r\n" +
+				"End Function\r\n";
+			document.body.appendChild(script);
+		});
 	}
 
-	APNGParser.prototype.read = function(url) {
-		var frames = new Frames(url);
+	function AISplitter() {
+	}
+
+	AISplitter.prototype.read = function(url, type) {
+		var frames = new Frames(url, type);
 		return frames;
 	};
 
-	window.APNGParser = APNGParser;
+	window.AISplitter = AISplitter;
 
 
 	//Image Object
-	function Frames(url) {
+	function Frames(url, type) {
 		this.width = 0;
 		this.height = 0;
 		this.numPlays = 0;
@@ -35,7 +48,7 @@
 		this._onload = [];
 		this.loaded = false;
 
-		this._urlToPNGFrames(url);
+		this._urlToFrames(url, type);
 	}
 
 	Frames.prototype.on = function(ev, func) {
@@ -44,15 +57,15 @@
 		}
 	};
 
-	Frames.prototype._urlToPNGFrames = function(url) {
+	Frames.prototype._urlToFrames = function(url, type) {
 		var _this = this;
 		var xhr = new XMLHttpRequest();
 
 		// XHR 2
-		var useResponseType = (typeof xhr.responseType !== "undefined");
+		var useResponseType = ("responseType" in xhr);
 		
 		// old Safari
-		var useXUserDefined = (typeof xhr.overrideMimeType !== "undefined" && !useResponseType);
+		var useXUserDefined = ("overrideMimeType" in xhr);
 
 		xhr.open('GET', url, true);
 		if (useResponseType) { // XHR 2
@@ -68,26 +81,24 @@
 
 					var reader = new FileReader();
 
-					if(typeof reader.readAsBinaryString !== "undefined") {
+					if("readAsBinaryString" in reader) {
 
 						reader.onload = function() {
-							_this._parseAPNG(this.result);
+							_this._switchType(this.result, type);
 						};
-
 						reader.readAsBinaryString(this.response);
 
 					} else { // IE 10~
 
 						reader.onload = function() {
-							var binary = "";
+							var binStr = "";
 							var bytes = new Uint8Array(this.result);
 							var length = bytes.byteLength;
 							for (var k = 0; k < length; ++k) {
-								binary += String.fromCharCode(bytes[k]);
+								binStr += String.fromCharCode(bytes[k]);
 							}
-							_this._parseAPNG(binary);
+							_this._switchType(binStr, type);
 						};
-
 						reader.readAsArrayBuffer(this.response);
 
 					}
@@ -98,7 +109,7 @@
 					if (isMSIE9) { // IE9
 
 						// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
-						var raw = APNGIEBinaryToBinStr(this.responseBody);
+						var raw = IEBinaryToBinStr(this.responseBody);
 						for (var j = 0, l = raw.length; j < l; ++j) {
 							var c = raw.charCodeAt(j);
 							res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
@@ -112,21 +123,29 @@
 						}
 
 					}
-					_this._parseAPNG(res);
+					_this._switchType(res, type);
 
 				}
 
 			} else if (this.readyState == 4) {
-				console.error("Can't read APNG date");
+				throw new Error("Can't read APNG date");
 			}
 		};
 		xhr.send();	
 	};
 
+	Frames.prototype._switchType = function(binStr, type) {
+		if(type === "image/png") {
+			this._parseAPNG(binStr);
+		} else if(type === "image/jpeg") {
+			this._parseMJPEG(binStr);
+		}
+	};
+
 	Frames.prototype._parseAPNG = function(imageData) {
 
 		if (imageData.substr(0, 8) !== PNG_SIGNATURE) {
-			console.error("This File is not PNG");
+			throw new TypeError("This File is not PNG");
 		}
 
 		var headerData, preData = "", postData = "", isAnimated = false;
@@ -145,7 +164,7 @@
 					break;
 				case "acTL":
 					isAnimated = true;
-					this.numPlays = readDWord(imageData.substr(off + 8 + 4, 4));
+					this.numPlays = readDWord(imageData.substr(off + 12, 4));
 					break;
 				case "fcTL":
 					if (frame) this.frames.push(frame);
@@ -167,7 +186,7 @@
 					frame.dataParts = [];
 					break;
 				case "fdAT":
-					if (frame) frame.dataParts.push(imageData.substr(off + 8 + 4, length - 4));
+					if (frame) frame.dataParts.push(imageData.substr(off + 12, length - 4));
 					break;
 				case "IDAT":
 					if (frame) frame.dataParts.push(imageData.substr(off + 8, length));
@@ -178,18 +197,18 @@
 				default:
 					preData += imageData.substr(off, length + 12);
 			}
-			off += 12 + length;
+			off += length + 12;
 		} while (type !== "IEND" && off < imageData.length);
-
 		if (frame) this.frames.push(frame);
+		frame = null;
 
 		if (!isAnimated) {
-			console.error("Non-animated PNG");
+			throw new TypeError("Non-animated PNG");
 		}
 
 		// make Image
 		var loadedImages = 0, _this = this;
-		for (var i = 0; i < this.frames.length; ++i) {
+		for (var i = 0, l = this.frames.length; i < l; ++i) {
 			var img = new Image();
 			frame = this.frames[i];
 			frame.img = img;
@@ -202,7 +221,7 @@
 			};
 
 			img.onerror = function () {
-				console.error("Image creation error");
+				throw new Error("Image creation error");
 			};
 
 			var db = new DataBuilder();
@@ -220,11 +239,80 @@
 		}
 	};
 
+	Frames.prototype._parseMJPEG = function(imageData) {
+
+		var marker = String.fromCharCode(0xff);
+		var SOI = marker + String.fromCharCode(0xd8);
+		var EOI = marker + String.fromCharCode(0xd9);
+
+		var mSecParFrame = 0, mul = 1;
+		for(var k=0; k<4; ++k) {
+			mSecParFrame += imageData.charCodeAt(32+k) * mul;
+			mul *= 256;
+		}
+		mSecParFrame /= 1000;
+
+		var data = imageData.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
+
+		var frame;
+		for(var i=0, l=data.length; i<l; ++i){
+			var SOFv = [], v = 0xc0;
+			while(v <= 0xcf) {
+				if(v !== 0xc4 && v !== 0xc8 && v !== 0xcc)
+					SOFv.push(String.fromCharCode(v));
+				++v;
+			}
+
+			frame = {};
+			var start = data[i].search(new RegExp(marker+"["+SOFv.join("")+"]"));
+			
+			frame.height = readWord(data[i].substr(start+5, 2));
+			frame.width = readWord(data[i].substr(start+7, 2));
+			frame.top = frame.left = 0;
+			frame.delay = mSecParFrame;
+			this.playTime += mSecParFrame;
+
+			this.frames.push(frame);
+		}
+
+		if(data.length !== this.frames.length) {
+			throw new Error("Shotage MJPG SOF data");
+		}
+
+		this.height = this.frames[0].height;
+		this.width = this.frames[0].width;
+
+		// make image
+		var loadedImages = 0, _this = this;
+		for (var j = 0, len = this.frames.length; j < l; ++j) {
+			var img = new Image();
+			this.frames[j].img = img;
+
+			img.onload = function () {
+				++loadedImages;
+				if (loadedImages == _this.frames.length) { // Load End
+					_this._loadend();
+				}
+			};
+
+			img.onerror = function () {
+				throw new Error("Image creation error");
+			};
+
+			var db = new DataBuilder();
+			db.append(data[j]);
+
+			img.src = db.getUrl("image/jpeg");
+		}
+
+	};
+
 	Frames.prototype._loadend = function() {
 		this.loaded = true;
 		for(var i=0, l=this._onload.length; i<l; ++i) {
 			this._onload.shift().call(this);
 		}
+		delete this._onload;
 	};
 
 
@@ -276,19 +364,6 @@
 			return "data:" + contentType + "," + escape(this.parts.join(""));
 		}
 	};
-
-	if (isMSIE9) {
-		// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
-		document.addEventListener("DOMContentLoaded", function () {
-			var script = document.createElement("script");
-			script.setAttribute('type', 'text/vbscript');
-			script.text =
-				"Function APNGIEBinaryToBinStr(Binary)\r\n" +
-				"   APNGIEBinaryToBinStr = CStr(Binary)\r\n" +
-				"End Function\r\n";
-			document.body.appendChild(script);
-		});
-	}
 
 
 	// crc32

@@ -1,17 +1,21 @@
-APNGParser v0.0.2
+Animation Image Splitter v1.0.0
 ==========
 
-Parse APNG to Normal PNG Flames.  
+Split Animation-PNG to PNG frames and Motion-JPEG to JPEG frames.  
 This Program is inspired by [APNG-canvas].  
 
-    var url = "hoge.png";
-    var APNG = new APNGParser();
-    var PNGFrames = APNG.read(url);
-    
-    PNGFrames.on("load", function() {
-    	// no argumants, use this
-    	console.log(this);
-    });
+	var ais = new AISplitter();
+	var JPEGObj = ais.read("mjpeg.avi", "image/jpeg");
+	var PNGObj = ais.read("apng.png", "image/png");
+	
+	JPEGObj.on("load", function() {
+		// no arguments, use this
+		console.log(this);
+	});
+
+	PNGObj.on("load", function() {
+		console.log(this);
+	});
 
 
 [APNG-canvas]:https://github.com/davidmz/apng-canvas 

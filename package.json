@@ -1,14 +1,10 @@
 {
-  "name": "APNGParser",
-  "version": "0.0.1",
-  "description": "APNG to Normal PNG Flames",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "name": "AISplitter",
+  "version": "1.0.0",
+  "description": "Split Animation-PNG to PNG frames and Motion-JPEG to JPEG frames",
   "repository": {
     "type": "git",
-    "url": "https://github.com/petamoriken/APNGParser.git"
+    "url": "https://github.com/petamoriken/AISplitter.git"
   },
   "keywords": [
     "APNG"
@@ -16,9 +12,9 @@
   "author": "Kenta Moriuchi",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/petamoriken/APNGParser/issues"
+    "url": "https://github.com/petamoriken/AISplitter/issues"
   },
-  "homepage": "https://github.com/petamoriken/APNGParser",
+  "homepage": "https://github.com/petamoriken/AISplitter",
   "devDependencies": {
     "gulp": "^3.8.8",
     "gulp-rename": "^1.2.0",
