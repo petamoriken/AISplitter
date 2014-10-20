@@ -267,7 +267,7 @@
 
 		var mSecPerFrame = 0, mul = 1;
 		for(var i = 0; i < 4; ++i) {
-			mSecPerFrame += imageStr.charCodeAt(32+k) * mul;
+			mSecPerFrame += imageStr.charCodeAt(32+i) * mul;
 			mul *= 256;
 		}
 		mSecPerFrame /= 1000;
