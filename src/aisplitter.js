@@ -1,5 +1,5 @@
 /*!
- * Animation Image Splitter v1.0.0 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
+ * Animation Image Splitter v1.0.1 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -54,6 +54,26 @@
 	Frames.prototype.on = function(ev, func) {
 		if(ev === "load") {
 			this._onload.push(func);
+		} else {
+			throw new Error("Not exist '"+ev+"' event");
+		}
+	};
+
+	Frames.prototype.off = function(ev, func) {
+		if(ev === "load") {
+
+			if(typeof func === "function") {
+				for(var i = 0, l = this._onload.length; i < l; ++i) {
+					if(this._onload[i] === func)
+						this._onload.splice(i, 1);
+				}
+
+			} else if(typeof func === "undefined") {
+				this._onload = [];
+			}
+
+		} else {
+			throw new Error("Not exist '"+ev+"' event");
 		}
 	};
 
@@ -128,47 +148,48 @@
 				}
 
 			} else if (this.readyState == 4) {
-				throw new Error("Can't read APNG date");
+				throw new Error("Can't read file");
 			}
 		};
 		xhr.send();	
 	};
 
 	Frames.prototype._switchType = function(binStr, type) {
-		if(type === "image/png") {
-			this._parseAPNG(binStr);
-		} else if(type === "image/jpeg") {
-			this._parseMJPEG(binStr);
-		}
+		if(type === "image/png")
+				this._parseAPNG(binStr);
+		else if(type === "image/jpeg")
+				this._parseMJPEG(binStr);
+		else
+			throw new Error("Not support type");
 	};
 
-	Frames.prototype._parseAPNG = function(imageData) {
+	Frames.prototype._parseAPNG = function(imageStr) {
 
-		if (imageData.substr(0, 8) !== PNG_SIGNATURE) {
-			throw new TypeError("This File is not PNG");
+		if (imageStr.substr(0, 8) !== PNG_SIGNATURE) {
+			throw new TypeError("This file is not PNG");
 		}
 
 		var headerData, preData = "", postData = "", isAnimated = false;
 
 		var off = 8, frame = null, length, type, data;
 		do {
-			length = readDWord(imageData.substr(off, 4));
-			type = imageData.substr(off + 4, 4);
+			length = readDWord(imageStr.substr(off, 4));
+			type = imageStr.substr(off + 4, 4);
 
 			switch (type) {
 				case "IHDR":
-					data = imageData.substr(off + 8, length);
+					data = imageStr.substr(off + 8, length);
 					headerData = data;
 					this.width = readDWord(data.substr(0, 4));
 					this.height = readDWord(data.substr(4, 4));
 					break;
 				case "acTL":
 					isAnimated = true;
-					this.numPlays = readDWord(imageData.substr(off + 12, 4));
+					this.numPlays = readDWord(imageStr.substr(off + 12, 4));
 					break;
 				case "fcTL":
 					if (frame) this.frames.push(frame);
-					data = imageData.substr(off + 8, length);
+					data = imageStr.substr(off + 8, length);
 					frame = {};
 					frame.width = readDWord(data.substr(4, 4));
 					frame.height = readDWord(data.substr(8, 4));
@@ -186,20 +207,23 @@
 					frame.dataParts = [];
 					break;
 				case "fdAT":
-					if (frame) frame.dataParts.push(imageData.substr(off + 12, length - 4));
+					if (frame) frame.dataParts.push(imageStr.substr(off + 12, length - 4));
 					break;
 				case "IDAT":
-					if (frame) frame.dataParts.push(imageData.substr(off + 8, length));
+					if (frame) frame.dataParts.push(imageStr.substr(off + 8, length));
 					break;
 				case "IEND":
-					postData = imageData.substr(off, length + 12);
+					postData = imageStr.substr(off, length + 12);
 					break;
 				default:
-					preData += imageData.substr(off, length + 12);
+					preData += imageStr.substr(off, length + 12);
 			}
 			off += length + 12;
-		} while (type !== "IEND" && off < imageData.length);
+		} while (type !== "IEND" && off < imageStr.length);
 		if (frame) this.frames.push(frame);
+
+		console.log(this.frames);
+
 		frame = null;
 
 		if (!isAnimated) {
@@ -215,7 +239,7 @@
 
 			img.onload = function () {
 				++loadedImages;
-				if (loadedImages == _this.frames.length) { // Load End
+				if (loadedImages === _this.frames.length) { // Load End
 					_this._loadend();
 				}
 			};
@@ -229,33 +253,31 @@
 			headerData = writeDWord(frame.width) + writeDWord(frame.height) + headerData.substr(8);
 			db.append(writeChunk("IHDR", headerData));
 			db.append(preData);
-			for (var j = 0; j < frame.dataParts.length; ++j) {
+			for (var j = 0; j < frame.dataParts.length; ++j)
 				db.append(writeChunk("IDAT", frame.dataParts[j]));
-			}
 			db.append(postData);
-
 			img.src = db.getUrl("image/png");
 			delete frame.dataParts;
 		}
 	};
 
-	Frames.prototype._parseMJPEG = function(imageData) {
+	Frames.prototype._parseMJPEG = function(imageStr) {
 
 		var marker = String.fromCharCode(0xff);
 		var SOI = marker + String.fromCharCode(0xd8);
 		var EOI = marker + String.fromCharCode(0xd9);
 
-		var mSecParFrame = 0, mul = 1;
-		for(var k=0; k<4; ++k) {
-			mSecParFrame += imageData.charCodeAt(32+k) * mul;
+		var mSecPerFrame = 0, mul = 1;
+		for(var i = 0; i < 4; ++i) {
+			mSecPerFrame += imageStr.charCodeAt(32+k) * mul;
 			mul *= 256;
 		}
-		mSecParFrame /= 1000;
+		mSecPerFrame /= 1000;
 
-		var data = imageData.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
+		var data = imageStr.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
 
 		var frame;
-		for(var i=0, l=data.length; i<l; ++i){
+		for(var i = 0, l=data.length; i<l; ++i){
 			var SOFv = [], v = 0xc0;
 			while(v <= 0xcf) {
 				if(v !== 0xc4 && v !== 0xc8 && v !== 0xcc)
@@ -269,14 +291,14 @@
 			frame.height = readWord(data[i].substr(start+5, 2));
 			frame.width = readWord(data[i].substr(start+7, 2));
 			frame.top = frame.left = 0;
-			frame.delay = mSecParFrame;
-			this.playTime += mSecParFrame;
+			frame.delay = mSecPerFrame;
+			this.playTime += mSecPerFrame;
 
 			this.frames.push(frame);
 		}
 
 		if(data.length !== this.frames.length) {
-			throw new Error("Shotage MJPG SOF data");
+			throw new TypeError("Shotage JPG SOF data");
 		}
 
 		this.height = this.frames[0].height;
@@ -284,13 +306,13 @@
 
 		// make image
 		var loadedImages = 0, _this = this;
-		for (var j = 0, len = this.frames.length; j < l; ++j) {
+		for (var i = 0, l=this.frames.length; i < l; ++i) {
 			var img = new Image();
-			this.frames[j].img = img;
+			this.frames[i].img = img;
 
 			img.onload = function () {
 				++loadedImages;
-				if (loadedImages == _this.frames.length) { // Load End
+				if (loadedImages === _this.frames.length) { // Load End
 					_this._loadend();
 				}
 			};
@@ -300,7 +322,7 @@
 			};
 
 			var db = new DataBuilder();
-			db.append(data[j]);
+			db.append(data[i]);
 
 			img.src = db.getUrl("image/jpeg");
 		}
@@ -309,10 +331,9 @@
 
 	Frames.prototype._loadend = function() {
 		this.loaded = true;
-		for(var i=0, l=this._onload.length; i<l; ++i) {
-			this._onload.shift().call(this);
+		for(var i = 0, l = this._onload.length; i < l; ++i) {
+			this._onload[i].call(this);
 		}
-		delete this._onload;
 	};
 
 

@@ -1,4 +1,4 @@
-Animation Image Splitter v1.0.0
+Animation Image Splitter v1.0.1
 ==========
 
 Split Animation-PNG to PNG frames and Motion-JPEG to JPEG frames.  
@@ -14,8 +14,10 @@ This Program is inspired by [APNG-canvas].
 	});
 
 	pngObj.on("load", function() {
+		// no call this function
 		console.log(this);
 	});
+	pngObj.off("load");
 
 
 [APNG-canvas]:https://github.com/davidmz/apng-canvas 

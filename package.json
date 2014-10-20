@@ -1,6 +1,6 @@
 {
   "name": "AISplitter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Split Animation-PNG to PNG frames and Motion-JPEG to JPEG frames",
   "repository": {
     "type": "git",
