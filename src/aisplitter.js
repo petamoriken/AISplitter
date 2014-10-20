@@ -55,7 +55,7 @@
 		if(ev === "load") {
 			this._onload.push(func);
 		} else {
-			throw new Error("Not exist '"+ev+"' event");
+			throw new Error("Don't exist '"+ev+"' event");
 		}
 	};
 
@@ -73,7 +73,7 @@
 			}
 
 		} else {
-			throw new Error("Not exist '"+ev+"' event");
+			throw new Error("Don't exist '"+ev+"' event");
 		}
 	};
 
@@ -160,7 +160,7 @@
 		else if(type === "image/jpeg")
 				this._parseMJPEG(binStr);
 		else
-			throw new Error("Not support type");
+			throw new Error("Don't support type");
 	};
 
 	Frames.prototype._parseAPNG = function(imageStr) {
@@ -221,8 +221,6 @@
 			off += length + 12;
 		} while (type !== "IEND" && off < imageStr.length);
 		if (frame) this.frames.push(frame);
-
-		console.log(this.frames);
 
 		frame = null;
 

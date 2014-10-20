@@ -14,7 +14,7 @@ This Program is inspired by [APNG-canvas].
 	});
 
 	pngObj.on("load", function() {
-		// no call this function
+		// don't call this function
 		console.log(this);
 	});
 	pngObj.off("load");
