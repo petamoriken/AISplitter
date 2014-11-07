@@ -1,5 +1,5 @@
 /*!
- * Animation Image Splitter v1.0.1 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
+ * Animation Image Splitter v1.0.2 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -41,9 +41,7 @@
 	function Frames(url, type) {
 		this.width = 0;
 		this.height = 0;
-		this.numPlays = 0;
 		this.frames = [];
-		this.playTime = 0;
 
 		this._onload = [];
 		this.loaded = false;
@@ -108,6 +106,7 @@
 						};
 						reader.readAsBinaryString(this.response);
 
+
 					} else { // IE 10~
 
 						reader.onload = function() {
@@ -135,12 +134,14 @@
 							res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
 						}
 
+
 					} else { // old Safari
 
 						var binStr = this.responseText;
 						for (var i = 0, len = binStr.length; i < len; ++i) {
 							res += String.fromCharCode(binStr.charCodeAt(i) & 0xff);
 						}
+
 
 					}
 					_this._switchType(res, type);
@@ -155,10 +156,10 @@
 	};
 
 	Frames.prototype._switchType = function(binStr, type) {
-		if(type === "image/png")
+		if(type === "APNG")
 				this._parseAPNG(binStr);
-		else if(type === "image/jpeg")
-				this._parseMJPEG(binStr);
+		else if(type === "XJPEG")
+				this._parseXJPEG(binStr);
 		else
 			throw new Error("Don't support type");
 	};
@@ -259,23 +260,19 @@
 		}
 	};
 
-	Frames.prototype._parseMJPEG = function(imageStr) {
+	Frames.prototype._parseXJPEG = function(imageStr) {
 
 		var marker = String.fromCharCode(0xff);
 		var SOI = marker + String.fromCharCode(0xd8);
 		var EOI = marker + String.fromCharCode(0xd9);
 
-		var mSecPerFrame = 0, mul = 1;
-		for(var i = 0; i < 4; ++i) {
-			mSecPerFrame += imageStr.charCodeAt(32+i) * mul;
-			mul *= 256;
-		}
-		mSecPerFrame /= 1000;
-
 		var data = imageStr.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
 
+		if(!("length" in data))
+			throw new Error("Can't read Binary String");
+
 		var frame;
-		for(var i = 0, l=data.length; i<l; ++i){
+		for(var i = 0, l=data.length; i<l; ++i) {
 			var SOFv = [], v = 0xc0;
 			while(v <= 0xcf) {
 				if(v !== 0xc4 && v !== 0xc8 && v !== 0xcc)
@@ -286,17 +283,15 @@
 			frame = {};
 			var start = data[i].search(new RegExp(marker+"["+SOFv.join("")+"]"));
 			
-			frame.height = readWord(data[i].substr(start+5, 2));
-			frame.width = readWord(data[i].substr(start+7, 2));
+			frame.height = readWord(data[i].substr(start + 5, 2));
+			frame.width = readWord(data[i].substr(start + 7, 2));
 			frame.top = frame.left = 0;
-			frame.delay = mSecPerFrame;
-			this.playTime += mSecPerFrame;
 
 			this.frames.push(frame);
 		}
 
 		if(data.length !== this.frames.length) {
-			throw new TypeError("Shotage JPG SOF data");
+			throw new TypeError("Shotage JPEG SOF data");
 		}
 
 		this.height = this.frames[0].height;
@@ -321,7 +316,6 @@
 
 			var db = new DataBuilder();
 			db.append(data[i]);
-
 			img.src = db.getUrl("image/jpeg");
 		}
 
