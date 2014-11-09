@@ -81,7 +81,7 @@
 
 		// XHR 2
 		var useResponseType = ("responseType" in xhr);
-		
+
 		// old Safari
 		var useXUserDefined = ("overrideMimeType" in xhr);
 
@@ -92,36 +92,55 @@
 			xhr.overrideMimeType('text/plain; charset=x-user-defined');
 		}
 
+		var isAndroid =	false;
+		var userAgent = window.navigator.userAgent.toLowerCase();
+
+		if (userAgent.indexOf('android') != -1) {
+			xhr.responseType = 'arraybuffer';
+			isAndroid = true;
+		}
+
 		xhr.onreadystatechange = function(e) {
 			if (this.readyState == 4 && this.status == 200) {
 
 				if (useResponseType) {
 
-					var reader = new FileReader();
-
-					if("readAsBinaryString" in reader) {
-
-						reader.onload = function() {
-							_this._switchType(this.result, type);
-						};
-						reader.readAsBinaryString(this.response);
-
-
-					} else { // IE 10~
-
-						reader.onload = function() {
-							var binStr = "";
-							var bytes = new Uint8Array(this.result);
-							var length = bytes.byteLength;
-							for (var k = 0; k < length; ++k) {
-								binStr += String.fromCharCode(bytes[k]);
+					if (isAndroid) {
+						var uInt8Array = new Uint8Array(this.response);
+						var i = uInt8Array.length;
+						var binaryString = new Array(i);
+						while (i--)
+							{
+								binaryString[i] = String.fromCharCode(uInt8Array[i]);
 							}
-							_this._switchType(binStr, type);
-						};
-						reader.readAsArrayBuffer(this.response);
+						var data = binaryString.join('');
+						_this._switchType(data, type);
+					} else {
+						var reader = new FileReader();
 
+						if("readAsBinaryString" in reader) {
+
+							reader.onload = function() {
+								_this._switchType(this.result, type);
+							};
+							reader.readAsBinaryString(this.response);
+
+
+						} else { // IE 10~
+
+							reader.onload = function() {
+								var binStr = "";
+								var bytes = new Uint8Array(this.result);
+								var length = bytes.byteLength;
+								for (var k = 0; k < length; ++k) {
+									binStr += String.fromCharCode(bytes[k]);
+								}
+								_this._switchType(binStr, type);
+							};
+							reader.readAsArrayBuffer(this.response);
+
+						}
 					}
-
 				} else {
 
 					var res = "";
@@ -152,7 +171,7 @@
 				throw new Error("Can't read file");
 			}
 		};
-		xhr.send();	
+		xhr.send();
 	};
 
 	Frames.prototype._switchType = function(binStr, type) {
@@ -282,7 +301,7 @@
 
 			frame = {};
 			var start = data[i].search(new RegExp(marker+"["+SOFv.join("")+"]"));
-			
+
 			frame.height = readWord(data[i].substr(start + 5, 2));
 			frame.width = readWord(data[i].substr(start + 7, 2));
 			frame.top = frame.left = 0;
