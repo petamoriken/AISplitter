@@ -1,5 +1,5 @@
 /*!
- * Animation Image Splitter v1.0.2 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken)
+ * Animation Image Splitter v2.0.0 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken) | http://git.io/bSTspQ
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -7,14 +7,26 @@
  * @license https://github.com/davidmz/apng-canvas/blob/master/LICENSE (MIT License)
  */
 
-(function(window) {
+(function(window, undef) {
 	"use strict";
+
+	// Modernizr https://github.com/Modernizr/Modernizr/blob/924c7611c170ef2dc502582e5079507aff61e388/src/testXhrType.js
+	var useResponseTypeBlob = (function() {
+		var xhr = new XMLHttpRequest();
+		xhr.open("get", "/", true);
+		try {
+			xhr.responseType = "blob";
+		} catch(e) {
+			return false;
+		}
+		return xhr.response !== undef && xhr.responseType === "blob";
+	})();
 
 	// IE9
 	var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
 
 	if (isMSIE9) {
-		// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
+		// http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
 		document.addEventListener("DOMContentLoaded", function () {
 			var script = document.createElement("script");
 			script.setAttribute('type', 'text/vbscript');
@@ -25,6 +37,8 @@
 			document.body.appendChild(script);
 		});
 	}
+
+
 
 	function AISplitter() {
 	}
@@ -68,7 +82,7 @@
 						evFunc.splice(i, 1);
 				}
 
-			} else if(func === void 0) {
+			} else if(func === undef) {
 				evFunc.splice(0, evFunc.length);
 			}
 
@@ -89,48 +103,26 @@
 		this.trigger("load");
 	};
 
-	Frames.prototype._urlToFrames = function(url, type, undef) {
+	Frames.prototype._urlToFrames = function(url, type) {
 		var _this = this;
 		var xhr = new XMLHttpRequest();
 
 		// XHR 2
 		var useResponseType = (xhr.responseType !== undef);
-		
-		// old Safari
-		var useXUserDefined = (xhr.overrideMimeType !== undef);
 
 		xhr.open('GET', url, true);
 		if (useResponseType) { // XHR 2
-			xhr.responseType = "blob";
-		} else if (useXUserDefined) { // old Safari
+			xhr.responseType = useResponseTypeBlob ? "blob" : "arraybuffer";
+		} else { // old Safari
 			xhr.overrideMimeType('text/plain; charset=x-user-defined');
-		}
-
-		var isAndroid =	false;
-		var userAgent = window.navigator.userAgent.toLowerCase();
-
-		if (userAgent.indexOf('android') != -1) {
-			xhr.responseType = 'arraybuffer';
-			isAndroid = true;
 		}
 
 		xhr.onreadystatechange = function(e) {
 			if (this.readyState == 4 && this.status == 200) {
 
-				if (useResponseType) {
+				if (useResponseType) { // XHR 2
 
-					if (isAndroid) {
-						var uInt8Array = new Uint8Array(this.response);
-						var i = uInt8Array.length;
-						var binaryString = new Array(i);
-						while (i--)
-							{
-								binaryString[i] = String.fromCharCode(uInt8Array[i]);
-							}
-						var data = binaryString.join('');
-						_this._switchType(data, type);
-
-					} else {
+					if(useResponseTypeBlob) { // Blob
 
 						var reader = new FileReader();
 
@@ -147,28 +139,38 @@
 								var binStr = "";
 								var bytes = new Uint8Array(this.result);
 								var length = bytes.byteLength;
-								for (var k = 0; k < length; ++k) {
-									binStr += String.fromCharCode(bytes[k]);
+								for (var i = 0; i < length; ++i) {
+									binStr += String.fromCharCode(bytes[i]);
 								}
 								_this._switchType(binStr, type);
 							};
 							reader.readAsArrayBuffer(this.response);
 
 						}
+
+					} else { // ArrayBuffer
+
+						var binStr = "";
+						var bytes = new Uint8Array(this.response);
+						var length = bytes.byteLength;
+						for (var i = 0; i < length; ++i) {
+							binStr += String.fromCharCode(bytes[i]);
+						}
+						_this._switchType(binStr, type);
+
 					}
-					
-				} else {
+
+				} else { // XHR 1
 
 					var res = "";
 					if (isMSIE9) { // IE9
 
-						// see http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
+						// http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
 						var raw = IEBinaryToBinStr(this.responseBody);
-						for (var j = 0, l = raw.length; j < l; ++j) {
-							var c = raw.charCodeAt(j);
+						for (var i = 0, l = raw.length; i < l; ++i) {
+							var c = raw.charCodeAt(i);
 							res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
 						}
-
 
 					} else { // old Safari
 
@@ -201,7 +203,7 @@
 	Frames.prototype._parseAPNG = function(imageStr) {
 
 		if (imageStr.substr(0, 8) !== PNG_SIGNATURE) {
-			this.trigger("error", new TypeError("This file is not PNG"));
+			this.trigger("error", new Error("This file is not PNG"));
 			return;
 		}
 
@@ -298,6 +300,7 @@
 
 	Frames.prototype._parseXJPEG = function(imageStr) {
 
+		var _this = this;
 		var marker = String.fromCharCode(0xff);
 		var SOI = marker + String.fromCharCode(0xd8);
 		var EOI = marker + String.fromCharCode(0xd9);
@@ -309,21 +312,50 @@
 			return;
 		}
 
-		var frame;
-		for(var i = 0, l=data.length; i<l; ++i) {
+		var mSecParFrame = (function(){
+			if(imageStr.substr(9, 12) !== AVI_HEADER) return null;
+
+			var mSecParFrame = 0, mul = 1;
+			for(var k=0; k<4; ++k) {
+				mSecParFrame += imageStr.charCodeAt(32+k) * mul;
+				mul *= 256;
+			}
+			mSecParFrame /= 1000;
+			_this.playTime = 0;
+			return mSecParFrame;
+		})();
+
+		var SOF = (function() {
 			var SOFv = [], v = 0xc0;
 			while(v <= 0xcf) {
 				if(v !== 0xc4 && v !== 0xc8 && v !== 0xcc)
 					SOFv.push(String.fromCharCode(v));
 				++v;
 			}
+			return new RegExp(marker+"["+SOFv.join("")+"]");
+		})();
 
-			frame = {};
-			var start = data[i].search(new RegExp(marker+"["+SOFv.join("")+"]"));
+		for(var i = 0, l=data.length; i<l; ++i) {
+
+			var frame = {};
+			var start = data[i].search(SOF);
 
 			frame.height = readWord(data[i].substr(start + 5, 2));
 			frame.width = readWord(data[i].substr(start + 7, 2));
-			frame.top = frame.left = 0;
+
+			if(i === 0) {
+				this.height = frame.height;
+				this.width = frame.width;
+				frame.top = frame.left = 0;
+			} else {
+				frame.top = (this.height - frame.height) / 2;
+				frame.left = (this.width - frame.width) / 2;
+			}
+
+			if(mSecParFrame !== null) {
+				frame.delay = mSecParFrame;
+				this.playTime += mSecParFrame;
+			}
 
 			this.frames.push(frame);
 		}
@@ -333,11 +365,8 @@
 			return;
 		}
 
-		this.height = this.frames[0].height;
-		this.width = this.frames[0].width;
-
 		// make image
-		var loadedImages = 0, _this = this;
+		var loadedImages = 0;
 		for (var i = 0, l=this.frames.length; i < l; ++i) {
 			var img = new Image();
 			this.frames[i].img = img;
@@ -365,6 +394,8 @@
 
 	// "\x89PNG\x0d\x0a\x1a\x0a"
 	var PNG_SIGNATURE = String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+
+	var AVI_HEADER = "AVI ";
 
 	function readDWord(data) {
 		var x = 0;

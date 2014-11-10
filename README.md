@@ -1,4 +1,4 @@
-Animation Image Splitter v1.0.2
+Animation Image Splitter v2.0.0
 ==========
 
 Split Animation-PNG to PNG frames and XJPEG (binary-combined JPEG or Motion-JPEG) to JPEG frames.  
@@ -21,14 +21,11 @@ This Program is inspired by [APNG-canvas].
 
 ##Support
 
-Support modern browser (IE9~) and mobile browser (iOS 7~), However does't work Android browser.
+Support modern browser (Chrome, Safari, Firefox, IE9~) and mobile browser (iOS 7~, Android 2.x, 4.x)
 
 ##License
-[MIT-License]
+[MIT License]
 
-##TODO
 
-Support Android browser.
-
-[MIT-License]:https://github.com/petamoriken/AISplitter/blob/master/LICENSE
+[MIT License]:https://github.com/petamoriken/AISplitter/blob/master/LICENSE
 [APNG-canvas]:https://github.com/davidmz/apng-canvas 
