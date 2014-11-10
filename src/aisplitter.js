@@ -1,5 +1,5 @@
 /*!
- * Animation Image Splitter v2.0.0 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken) | http://git.io/bSTspQ
+ * Animation Image Splitter v2.0.1 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken) | http://git.io/bSTspQ
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -38,8 +38,7 @@
 		});
 	}
 
-
-
+	// main
 	function AISplitter() {
 	}
 
@@ -56,16 +55,18 @@
 		this.width = 0;
 		this.height = 0;
 		this.frames = [];
+		this.type = type;
 
 		this._onload = [];
 		this._onerror = [];
+		this._onprogress = [];
 		this.loaded = false;
 
 		this._urlToFrames(url, type);
 	}
 
 	Frames.prototype.on = function(ev, func) {
-		if(ev === "load" || ev === "error") {
+		if(ev === "load" || ev === "error" || ev === "progress") {
 			this["_on" + ev].push(func);
 		} else {
 			throw new Error("Don't exist '"+ev+"' event");
@@ -73,7 +74,7 @@
 	};
 
 	Frames.prototype.off = function(ev, func) {
-		if(ev === "load" || ev === "error") {
+		if(ev === "load" || ev === "error" || ev === "progress") {
 			var evFunc = this["_on" + ev];
 
 			if(typeof func === "function") {
@@ -81,20 +82,29 @@
 					if(evFunc[i] === func)
 						evFunc.splice(i, 1);
 				}
-
 			} else if(func === undef) {
 				evFunc.splice(0, evFunc.length);
 			}
-
 		} else {
-			this.trigger("error", new Error("Don't exist '"+ev+"' event"));
+			throw new Error("Don't exist '"+ev+"' event");
 		}
 	};
 
 	Frames.prototype.trigger = function(ev, obj) {
-		var evFunc = this["_on" + ev];
-		for(var i = 0, l = evFunc.length; i < l; ++i) {
-			evFunc[i].call(this, obj);
+		if(ev === "load" || ev === "error" || ev === "progress") {
+			obj = obj || [];
+			obj.frames = this.frames;
+
+			obj.number = obj.number !== undef ? obj.number : null;
+			obj.frame = obj.frame || null;
+			obj.error = obj.error || null;
+
+			var evFunc = this["_on" + ev];
+			for(var i = 0, l = evFunc.length; i < l; ++i) {
+				evFunc[i].call(this, obj);
+			}
+		} else {
+			throw new Error("Don't exist '"+ev+"' event");
 		}
 	};
 
@@ -185,7 +195,7 @@
 				}
 
 			} else if (this.readyState == 4) {
-				_this.trigger("error", new Error("Can't read file"));
+				_this.trigger("error", {error:"Can't read file"});
 			}
 		};
 		xhr.send();
@@ -197,13 +207,13 @@
 		else if(type === "XJPEG")
 				this._parseXJPEG(binStr);
 		else
-			this.trigger("error", new Error("Don't support type"));
+			this.trigger("error", {error:"Don't support type"});
 	};
 
 	Frames.prototype._parseAPNG = function(imageStr) {
 
 		if (imageStr.substr(0, 8) !== PNG_SIGNATURE) {
-			this.trigger("error", new Error("This file is not PNG"));
+			this.trigger("error", {error:"This file is not PNG"});
 			return;
 		}
 
@@ -263,7 +273,7 @@
 		frame = null;
 
 		if (!isAnimated) {
-			this.trigger("error", new Error("Non-animated PNG"));
+			this.trigger("error", {error:"Non-animated PNG"});
 			return;
 		}
 
@@ -274,16 +284,8 @@
 			frame = this.frames[i];
 			frame.img = img;
 
-			img.onload = function () {
-				++loadedImages;
-				if (loadedImages === _this.frames.length) { // Load End
-					_this._loadend();
-				}
-			};
-
-			img.onerror = function () {
-				_this.trigger("error", new Error("Image creation error"));
-			};
+			img.onload = onload(i, frame);
+			img.onerror = onerror;
 
 			var db = new DataBuilder();
 			db.append(PNG_SIGNATURE);
@@ -295,6 +297,21 @@
 			db.append(postData);
 			img.src = db.getUrl("image/png");
 			delete frame.dataParts;
+		}
+
+		function onload(num, frame) {
+			return function() {
+				++loadedImages;
+
+				_this.trigger("progress", {number:num, frame:frame});
+				if (loadedImages === _this.frames.length) { // Load End
+					_this._loadend();
+				}
+			};
+		}
+
+		function onerror() {
+			_this.trigger("error", {error:"Image creation error"});
 		}
 	};
 
@@ -308,7 +325,7 @@
 		var data = imageStr.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
 
 		if(!("length" in data)) {
-			this.trigger("error", new Error("Can't read JPEG Binary String"));
+			this.trigger("error", {error:"Can't read JPEG Binary String"});
 			return;
 		}
 
@@ -361,7 +378,7 @@
 		}
 
 		if(data.length !== this.frames.length) {
-			this.trigger("error", new Error("Shotage JPEG SOF data"));
+			this.trigger("error", {error:"Shotage JPEG SOF data"});
 			return;
 		}
 
@@ -369,24 +386,31 @@
 		var loadedImages = 0;
 		for (var i = 0, l=this.frames.length; i < l; ++i) {
 			var img = new Image();
-			this.frames[i].img = img;
+			var frame = this.frames[i];
+			frame.img = img;
 
-			img.onload = function () {
-				++loadedImages;
-				if (loadedImages === _this.frames.length) { // Load End
-					_this._loadend();
-				}
-			};
-
-			img.onerror = function () {
-				_this.trigger("error", new Error("Image creation error"));
-			};
+			img.onload = onload(i, frame);
+			img.onerror = onerror;
 
 			var db = new DataBuilder();
 			db.append(data[i]);
 			img.src = db.getUrl("image/jpeg");
 		}
 
+		function onload(num, frame) {
+			return function() {
+				++loadedImages;
+
+				_this.trigger("progress", {number:num, frame:frame});
+				if (loadedImages === _this.frames.length) { // Load End
+					_this._loadend();
+				}
+			};
+		}
+
+		function onerror() {
+			_this.trigger("error", {error:"Image creation error"});
+		}
 	};
 
 
