@@ -44,46 +44,60 @@
 		this.frames = [];
 
 		this._onload = [];
+		this._onerror = [];
 		this.loaded = false;
 
 		this._urlToFrames(url, type);
 	}
 
 	Frames.prototype.on = function(ev, func) {
-		if(ev === "load") {
-			this._onload.push(func);
+		if(ev === "load" || ev === "error") {
+			this["_on" + ev].push(func);
 		} else {
 			throw new Error("Don't exist '"+ev+"' event");
 		}
 	};
 
 	Frames.prototype.off = function(ev, func) {
-		if(ev === "load") {
+		if(ev === "load" || ev === "error") {
+			var evFunc = this["_on" + ev];
 
 			if(typeof func === "function") {
-				for(var i = 0, l = this._onload.length; i < l; ++i) {
-					if(this._onload[i] === func)
-						this._onload.splice(i, 1);
+				for(var i = 0, l = evFunc.length; i < l; ++i) {
+					if(evFunc[i] === func)
+						evFunc.splice(i, 1);
 				}
 
-			} else if(typeof func === "undefined") {
-				this._onload = [];
+			} else if(func === void 0) {
+				evFunc.splice(0, evFunc.length);
 			}
 
 		} else {
-			throw new Error("Don't exist '"+ev+"' event");
+			this.trigger("error", new Error("Don't exist '"+ev+"' event"));
 		}
 	};
 
-	Frames.prototype._urlToFrames = function(url, type) {
+	Frames.prototype.trigger = function(ev, obj) {
+		var evFunc = this["_on" + ev];
+		for(var i = 0, l = evFunc.length; i < l; ++i) {
+			evFunc[i].call(this, obj);
+		}
+	};
+
+	Frames.prototype._loadend = function() {
+		this.loaded = true;
+		this.trigger("load");
+	};
+
+	Frames.prototype._urlToFrames = function(url, type, undef) {
 		var _this = this;
 		var xhr = new XMLHttpRequest();
 
 		// XHR 2
-		var useResponseType = ("responseType" in xhr);
+		var useResponseType = (xhr.responseType !== undef);
 		
 		// old Safari
-		var useXUserDefined = ("overrideMimeType" in xhr);
+		var useXUserDefined = (xhr.overrideMimeType !== undef);
 
 		xhr.open('GET', url, true);
 		if (useResponseType) { // XHR 2
@@ -99,13 +113,12 @@
 
 					var reader = new FileReader();
 
-					if("readAsBinaryString" in reader) {
+					if(reader.readAsBinaryString !== undef) {
 
 						reader.onload = function() {
 							_this._switchType(this.result, type);
 						};
 						reader.readAsBinaryString(this.response);
-
 
 					} else { // IE 10~
 
@@ -142,14 +155,13 @@
 							res += String.fromCharCode(binStr.charCodeAt(i) & 0xff);
 						}
 
-
 					}
 					_this._switchType(res, type);
 
 				}
 
 			} else if (this.readyState == 4) {
-				throw new Error("Can't read file");
+				_this.trigger("error", new Error("Can't read file"));
 			}
 		};
 		xhr.send();	
@@ -161,13 +173,14 @@
 		else if(type === "XJPEG")
 				this._parseXJPEG(binStr);
 		else
-			throw new Error("Don't support type");
+			this.trigger("error", new Error("Don't support type"));
 	};
 
 	Frames.prototype._parseAPNG = function(imageStr) {
 
 		if (imageStr.substr(0, 8) !== PNG_SIGNATURE) {
-			throw new TypeError("This file is not PNG");
+			this.trigger("error", new TypeError("This file is not PNG"));
+			return;
 		}
 
 		var headerData, preData = "", postData = "", isAnimated = false;
@@ -226,7 +239,8 @@
 		frame = null;
 
 		if (!isAnimated) {
-			throw new TypeError("Non-animated PNG");
+			this.trigger("error", new Error("Non-animated PNG"));
+			return;
 		}
 
 		// make Image
@@ -244,7 +258,7 @@
 			};
 
 			img.onerror = function () {
-				throw new Error("Image creation error");
+				_this.trigger("error", new Error("Image creation error"));
 			};
 
 			var db = new DataBuilder();
@@ -268,8 +282,10 @@
 
 		var data = imageStr.match(new RegExp(SOI+"[\\s\\S]+?"+EOI, "g"));
 
-		if(!("length" in data))
-			throw new Error("Can't read Binary String");
+		if(!("length" in data)) {
+			this.trigger("error", new Error("Can't read JPEG Binary String"));
+			return;
+		}
 
 		var frame;
 		for(var i = 0, l=data.length; i<l; ++i) {
@@ -291,7 +307,8 @@
 		}
 
 		if(data.length !== this.frames.length) {
-			throw new TypeError("Shotage JPEG SOF data");
+			this.trigger("error", new Error("Shotage JPEG SOF data"));
+			return;
 		}
 
 		this.height = this.frames[0].height;
@@ -311,7 +328,7 @@
 			};
 
 			img.onerror = function () {
-				throw new Error("Image creation error");
+				_this.trigger("error", new Error("Image creation error"));
 			};
 
 			var db = new DataBuilder();
@@ -319,13 +336,6 @@
 			img.src = db.getUrl("image/jpeg");
 		}
 
-	};
-
-	Frames.prototype._loadend = function() {
-		this.loaded = true;
-		for(var i = 0, l = this._onload.length; i < l; ++i) {
-			this._onload[i].call(this);
-		}
 	};
 
 
