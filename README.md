@@ -57,21 +57,21 @@ Mobile Safari iOS 6~, Android Browser 2.x, 4.x
 ###frame
 
 
-| Property  | Type    | Description                  |
-|:---------:|:-------:|:-----------------------------|
-| `.width`  | integer | This image's width           |
-| `.height` | integer | This image's height          |
-| `.left`   | integer | left of center position      |
-| `.top`    | integer | top of center position       |
-| `.delay`  | integer | APNG's or MJPEG's delay time |
-| `.img`    | Image   | Image Object                 |
+| Property  | Type    | Description                       |
+|:---------:|:-------:|:----------------------------------|
+| `.width`  | integer | This image's width                |
+| `.height` | integer | This image's height               |
+| `.left`   | integer | left of center position           |
+| `.top`    | integer | top of center position            |
+| `.delay`  | integer | APNG's or MJPEG(AVI)'s delay time |
+| `.img`    | Image   | Image Object                      |
 
 
 ##TODO
 
 * `.read` from File Reader API
 * HTTP Range Request
-* MJPEG(MOV) support
+* MJPEG(MOV) support (`.playTime`, `.delay`)
 
 
 ##License
