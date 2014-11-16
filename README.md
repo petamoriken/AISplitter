@@ -45,29 +45,37 @@ Mobile Safari iOS 6~, Android Browser 2.x, 4.x
 | `.off(event[,function])`    | Remove event method<br>If you didn't set `function`, all `event` method was removed. |
 |`.trigger(event[,data])`     | Trigger the event<br>If you set `data`(Object), the callback argument in `.on()` gets the data. |
 
-| Property   | Type    | Description              |
-|:----------:|:-------:|:-------------------------|
-| `.loaded`  | boolean | Loadend flag             |
-| `.width`   | integer | The first image's width  |
-| `.height`  | integer | The first image's height |
-|`.playTime` | integer | `"APNG"`'s play time     |
+| Property   | Type    | Description                      |
+|:----------:|:-------:|:---------------------------------|
+| `.loaded`  | boolean | Loadend flag                     |
+| `.width`   | integer | The first image's width          |
+| `.height`  | integer | The first image's height         |
+|`.playTime` | integer | APNG's or MJPEG(AVI)'s play time |
 | `.type`    | string  | `"APNG"` or `"XJPEG"`<br>get `type` of value set by `AISplitter.read()` |
-| `.frames`  | Array   | Array of `frame` Objects |
+| `.frames`  | Array   | Array of `frame` Objects         |
 
 ###frame
 
 
-| Property  | Type    | Description             |
-|:---------:|:-------:|:------------------------|
-| `.width`  | integer | This image's width      |
-| `.height` | integer | This image's height     |
-| `.left`   | integer | left of center position |
-| `.top`    | integer | top of center position  |
-| `.delay`  | integer | `"APNG"`'s delay time   |
-| `.img`    | Image   | Image Object            |
+| Property  | Type    | Description                  |
+|:---------:|:-------:|:-----------------------------|
+| `.width`  | integer | This image's width           |
+| `.height` | integer | This image's height          |
+| `.left`   | integer | left of center position      |
+| `.top`    | integer | top of center position       |
+| `.delay`  | integer | APNG's or MJPEG's delay time |
+| `.img`    | Image   | Image Object                 |
+
+
+##TODO
+
+* `.read` from File Reader API
+* HTTP Range Request
+* MJPEG(MOV) support
 
 
 ##License
+
 [MIT License]
 
 
