@@ -4,7 +4,9 @@ var rename = require("gulp-rename");
 
 gulp.task("default", function() {
 	gulp.src("src/aisplitter.js")
-		.pipe(uglify({preserveComments:"some"}))
+		.pipe(uglify({mangle:{
+			except: ["AISplitter", "Frames"]
+		} ,preserveComments:"some"}))
 		.pipe(rename("aisplitter.min.js"))
 		.pipe(gulp.dest("./"));
 });
