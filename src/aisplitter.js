@@ -1,5 +1,5 @@
 /*!
- * Animation Image Splitter v2.0.1 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken) | http://git.io/bSTspQ
+ * Animation Image Splitter v2.0.2 | MIT Licence | 2014 Kenta Moriuchi (@printf_moriken) | http://git.io/bSTspQ
  *
  * This Program is inspired by APNG-canvas.
  * @copyright 2011 David Mzareulyan
@@ -9,34 +9,6 @@
 
 (function(window, undef) {
 	"use strict";
-
-	// Modernizr https://github.com/Modernizr/Modernizr/blob/924c7611c170ef2dc502582e5079507aff61e388/src/testXhrType.js
-	var useResponseTypeBlob = (function() {
-		var xhr = new XMLHttpRequest();
-		xhr.open("get", "/", true);
-		try {
-			xhr.responseType = "blob";
-		} catch(e) {
-			return false;
-		}
-		return xhr.response !== undef && xhr.responseType === "blob";
-	})();
-
-	// IE9
-	var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
-
-	if (isMSIE9) {
-		// http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
-		document.addEventListener("DOMContentLoaded", function () {
-			var script = document.createElement("script");
-			script.setAttribute('type', 'text/vbscript');
-			script.text =
-				"Function IEBinaryToBinStr(Binary)\r\n" +
-				"   IEBinaryToBinStr = CStr(Binary)\r\n" +
-				"End Function\r\n";
-			document.body.appendChild(script);
-		});
-	}
 
 	// main
 	function AISplitter() {
@@ -50,12 +22,13 @@
 	window.AISplitter = AISplitter;
 
 
-	//Image Object
+	//Frames Object
 	function Frames(url, type) {
 		this.width = 0;
 		this.height = 0;
 		this.frames = [];
 		this.type = type;
+		this.playTime = 0;
 
 		this._onload = [];
 		this._onerror = [];
@@ -113,93 +86,134 @@
 		this.trigger("load");
 	};
 
-	Frames.prototype._urlToFrames = function(url, type) {
-		var _this = this;
-		var xhr = new XMLHttpRequest();
+	Frames.prototype._urlToFrames = (function() {
 
 		// XHR 2
-		var useResponseType = (xhr.responseType !== undef);
+		var useResponseType, useResponseTypeBlob;
 
-		xhr.open('GET', url, true);
-		if (useResponseType) { // XHR 2
-			xhr.responseType = useResponseTypeBlob ? "blob" : "arraybuffer";
-		} else { // old Safari
-			xhr.overrideMimeType('text/plain; charset=x-user-defined');
+		// XHR 1
+		var useXUserDefined;
+
+		// Modernizr https://github.com/Modernizr/Modernizr/blob/924c7611c170ef2dc502582e5079507aff61e388/src/testXhrType.js
+		(function() {
+			var xhr = new XMLHttpRequest();
+			useResponseType = (xhr.responseType !== undef);
+			useXUserDefined = (xhr.overrideMimeType !== undef && !useResponseType);
+
+			if(!useResponseType) {
+				useResponseTypeBlob = false;
+				return;
+			}
+
+			xhr.open("get", "/", true);
+			try {
+				xhr.responseType = "blob";
+			} catch(e) {
+				useResponseTypeBlob = false;
+				return;
+			}
+			useResponseTypeBlob = (xhr.response !== undef && xhr.responseType === "blob");
+		})();
+
+		// IE9 http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
+		var isMSIE9 = navigator.userAgent.match(/msie [9.]/i);
+
+		if (isMSIE9) {
+			document.addEventListener("DOMContentLoaded", function() {
+				var script = document.createElement("script");
+				script.setAttribute('type', 'text/vbscript');
+				script.text =
+					"Function IEBinaryToBinStr(Binary)\r\n" +
+					"   IEBinaryToBinStr = CStr(Binary)\r\n" +
+					"End Function\r\n";
+				document.body.appendChild(script);
+			});
 		}
 
-		xhr.onreadystatechange = function(e) {
-			if (this.readyState == 4 && this.status == 200) {
+		return function(url, type) {
+			var _this = this;
+			var xhr = new XMLHttpRequest();
 
-				if (useResponseType) { // XHR 2
-
-					if(useResponseTypeBlob) { // Blob
-
-						var reader = new FileReader();
-
-						if(reader.readAsBinaryString !== undef) {
-
-							reader.onload = function() {
-								_this._switchType(this.result, type);
-							};
-							reader.readAsBinaryString(this.response);
-
-						} else { // IE 10~
-
-							reader.onload = function() {
-								var binStr = "";
-								var bytes = new Uint8Array(this.result);
-								var length = bytes.byteLength;
-								for (var i = 0; i < length; ++i) {
-									binStr += String.fromCharCode(bytes[i]);
-								}
-								_this._switchType(binStr, type);
-							};
-							reader.readAsArrayBuffer(this.response);
-
-						}
-
-					} else { // ArrayBuffer
-
-						var binStr = "";
-						var bytes = new Uint8Array(this.response);
-						var length = bytes.byteLength;
-						for (var i = 0; i < length; ++i) {
-							binStr += String.fromCharCode(bytes[i]);
-						}
-						_this._switchType(binStr, type);
-
-					}
-
-				} else { // XHR 1
-
-					var res = "";
-					if (isMSIE9) { // IE9
-
-						// http://miskun.com/javascript/internet-explorer-and-binary-files-data-access/
-						var raw = IEBinaryToBinStr(this.responseBody);
-						for (var i = 0, l = raw.length; i < l; ++i) {
-							var c = raw.charCodeAt(i);
-							res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
-						}
-
-					} else { // old Safari
-
-						var binStr = this.responseText;
-						for (var i = 0, len = binStr.length; i < len; ++i) {
-							res += String.fromCharCode(binStr.charCodeAt(i) & 0xff);
-						}
-
-					}
-					_this._switchType(res, type);
-
-				}
-
-			} else if (this.readyState == 4) {
-				_this.trigger("error", {error:"Can't read file"});
+			xhr.open('GET', url, true);
+			if (useResponseType) { // XHR 2
+				xhr.responseType = useResponseTypeBlob ? "blob" : "arraybuffer";
+			} else if(useXUserDefined) { // old Safari
+				xhr.overrideMimeType('text/plain; charset=x-user-defined');
 			}
+
+			xhr.onreadystatechange = function(e) {
+				if (this.readyState == 4 && this.status == 200) {
+
+					if (useResponseType) { // XHR 2
+
+						if(useResponseTypeBlob) { // Blob
+
+							var reader = new FileReader();
+
+							if(reader.readAsBinaryString !== undef) {
+
+								reader.onload = function() {
+									_this._switchType(this.result, type);
+								};
+								reader.readAsBinaryString(this.response);
+
+							} else { // IE 10~
+
+								reader.onload = function() {
+									var binStr = "";
+									var bytes = new Uint8Array(this.result);
+									var length = bytes.byteLength;
+									for (var i = 0; i < length; ++i) {
+										binStr += String.fromCharCode(bytes[i]);
+									}
+									_this._switchType(binStr, type);
+								};
+								reader.readAsArrayBuffer(this.response);
+
+							}
+
+						} else { // ArrayBuffer
+
+							var binStr = "";
+							var bytes = new Uint8Array(this.response);
+							var length = bytes.byteLength;
+							for (var i = 0; i < length; ++i) {
+								binStr += String.fromCharCode(bytes[i]);
+							}
+							_this._switchType(binStr, type);
+
+						}
+
+					} else { // XHR 1
+
+						var res = "";
+						if (isMSIE9) { // IE9
+
+							var raw = IEBinaryToBinStr(this.responseBody);
+							for (var i = 0, l = raw.length; i < l; ++i) {
+								var c = raw.charCodeAt(i);
+								res += String.fromCharCode(c & 0xff, (c >> 8) & 0xff);
+							}
+
+						} else { // old Safari
+
+							var binStr = this.responseText;
+							for (var i = 0, len = binStr.length; i < len; ++i) {
+								res += String.fromCharCode(binStr.charCodeAt(i) & 0xff);
+							}
+
+						}
+						_this._switchType(res, type);
+
+					}
+
+				} else if (this.readyState == 4) {
+					_this.trigger("error", {error:"Can't read file"});
+				}
+			};
+			xhr.send();
 		};
-		xhr.send();
-	};
+	})();
 
 	Frames.prototype._switchType = function(binStr, type) {
 		if(type === "APNG")
@@ -342,7 +356,7 @@
 			return mSecParFrame;
 		})();
 
-		var SOF = (function() {
+		var SOFReg = (function() {
 			var SOFv = [], v = 0xc0;
 			while(v <= 0xcf) {
 				if(v !== 0xc4 && v !== 0xc8 && v !== 0xcc)
@@ -355,7 +369,7 @@
 		for(var i = 0, l=data.length; i<l; ++i) {
 
 			var frame = {};
-			var start = data[i].search(SOF);
+			var start = data[i].search(SOFReg);
 
 			frame.height = readWord(data[i].substr(start + 5, 2));
 			frame.width = readWord(data[i].substr(start + 7, 2));
@@ -467,19 +481,21 @@
 
 
 	// crc32
-	var table = new Array(256);
+	var crc32 = (function() {
+		var table = new Array(256);
+		for(var i=0; i<256; ++i) {
+			var c=i;
+			for (var k=0; k<8; ++k) c = (c&1) ? 0xEDB88320 ^ (c>>>1) : c>>>1;
+			table[i] = c;
+		}
 
-	for(var i=0; i<256; ++i) {
-		var c=i;
-		for (var k=0; k<8; ++k) c = (c&1) ? 0xEDB88320 ^ (c>>>1) : c>>>1;
-		table[i] = c;
-	}
-
-	function crc32(str) {
-		var crc = -1;
-		for( var i = 0, l = str.length; i < l; ++i )
-			crc = ( crc >>> 8 ) ^ table[( crc ^ str.charCodeAt( i ) ) & 0xFF];
-		return crc ^ (-1);
-	}
+		return function(str) {
+			var crc = -1;
+			for( var i = 0, l = str.length; i < l; ++i )
+				crc = ( crc >>> 8 ) ^ table[( crc ^ str.charCodeAt( i ) ) & 0xFF];
+			return crc ^ (-1);
+		};
+	})();
+	
 
 })(this);

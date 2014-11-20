@@ -1,4 +1,4 @@
-#Animation Image Splitter v2.0.1
+#Animation Image Splitter v2.0.2
 
 
 Split Animation-PNG to PNG frames and XJPEG (binary-combined JPEG or Motion-JPEG) to JPEG frames.  
